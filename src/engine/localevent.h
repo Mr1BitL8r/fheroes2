@@ -157,24 +157,6 @@ enum KeySym
     KEY_KP_ENTER = SDLK_KP_ENTER,
     KEY_KP_EQUALS = SDLK_KP_EQUALS,
 
-#ifdef _WIN32_WCE
-    KEY_APP01 = 0xC1,
-    KEY_APP02 = 0xC2,
-    KEY_APP03 = 0xC3,
-    KEY_APP04 = 0xC4,
-    KEY_APP05 = 0xC5,
-    KEY_APP06 = 0xC6,
-    KEY_APP07 = 0xC7,
-    KEY_APP08 = 0xC8,
-    KEY_APP09 = 0xC9,
-    KEY_APP10 = 0xCA,
-    KEY_APP11 = 0xCB,
-    KEY_APP12 = 0xCC,
-    KEY_APP13 = 0xCD,
-    KEY_APP14 = 0xCE,
-    KEY_APP15 = 0xCF,
-#endif
-
     KEY_LAST
 };
 
@@ -192,8 +174,8 @@ public:
     void SetGlobalFilter( bool );
     void SetTapMode( bool );
     void SetTapDelayForRightClickEmulation( u32 );
-    void SetMouseOffsetX( s16 );
-    void SetMouseOffsetY( s16 );
+    void SetMouseOffsetX( int16_t );
+    void SetMouseOffsetY( int16_t );
 
     static void SetStateDefaults( void );
     static void SetState( u32 type, bool enable );
@@ -204,7 +186,11 @@ public:
     bool MouseMotion( void ) const;
     bool MouseMotion( const Rect & rt ) const;
 
-    const Point & GetMouseCursor( void );
+    const Point & GetMouseCursor( void )
+    {
+        return mouse_cu;
+    }
+
     const Point & GetMousePressLeft( void ) const;
     const Point & GetMousePressMiddle( void ) const;
     const Point & GetMousePressRight( void ) const;
@@ -253,23 +239,16 @@ public:
 
     bool KeyPress( void ) const;
     bool KeyPress( KeySym key ) const;
+
+    bool KeyHold() const
+    {
+        return ( modes & KEY_HOLD ) != 0;
+    }
+
     KeySym KeyValue( void ) const;
     int KeyMod( void ) const;
 
-#ifdef WITHOUT_MOUSE
-    void ToggleEmulateMouse( void );
-    void SetEmulateMouse( bool );
-    void SetEmulateMouseUpKey( KeySym );
-    void SetEmulateMouseDownKey( KeySym );
-    void SetEmulateMouseLeftKey( KeySym );
-    void SetEmulateMouseRightKey( KeySym );
-    void SetEmulateMouseStep( u8 );
-    void SetEmulatePressLeftKey( KeySym );
-    void SetEmulatePressRightKey( KeySym );
-    bool EmulateMouseAction( KeySym );
-#endif
-
-    void RegisterCycling() const;
+    void RegisterCycling( void ( *preRenderDrawing )() = nullptr, void ( *postRenderDrawing )() = nullptr ) const;
 
     // These two methods are useful for video playback
     void PauseCycling();
@@ -295,13 +274,14 @@ private:
         MOUSE_MOTION = 0x0002,
         MOUSE_PRESSED = 0x0004,
         GLOBAL_FILTER = 0x0008,
-        CLICK_LEFT = 0x0010,
-        CLICK_RIGHT = 0x0020,
-        CLICK_MIDDLE = 0x0040,
+        CLICK_LEFT = 0x0010, // either there is a click on left button or it was just released
+        CLICK_RIGHT = 0x0020, // either there is a click on right button or it was just released
+        CLICK_MIDDLE = 0x0040, // either there is a click on middle button or it was just released
         TAP_MODE = 0x0080,
         MOUSE_OFFSET = 0x0100,
         CLOCK_ON = 0x0200,
-        MOUSE_WHEEL = 0x0400
+        MOUSE_WHEEL = 0x0400,
+        KEY_HOLD = 0x0800
     };
 
     void SetModes( flag_t );
@@ -337,17 +317,6 @@ private:
     bool _isHiddenWindow;
     bool _isMusicPaused;
     bool _isSoundPaused;
-
-#ifdef WITHOUT_MOUSE
-    bool emulate_mouse;
-    KeySym emulate_mouse_up;
-    KeySym emulate_mouse_down;
-    KeySym emulate_mouse_left;
-    KeySym emulate_mouse_right;
-    int emulate_mouse_step;
-    KeySym emulate_press_left;
-    KeySym emulate_press_right;
-#endif
 };
 
 #endif

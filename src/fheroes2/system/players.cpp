@@ -21,6 +21,7 @@
  ***************************************************************************/
 
 #include <algorithm>
+#include <assert.h>
 
 #include "game.h"
 #include "maps_fileinfo.h"
@@ -30,7 +31,8 @@
 
 namespace
 {
-    Player * _players[KINGDOMMAX + 1] = {NULL};
+    const int playersSize = KINGDOMMAX + 1;
+    Player * _players[playersSize] = {NULL};
     int human_colors = 0;
 
     enum
@@ -286,7 +288,7 @@ void Players::Init( const Maps::FileInfo & fi )
             player->SetControl( CONTROL_AI );
             player->SetFriends( *it | fi.unions[Color::GetIndex( *it )] );
 
-            if ( ( *it & fi.HumanOnlyColors() ) && Settings::Get().GameType( Game::TYPE_MULTI ) )
+            if ( ( *it & fi.HumanOnlyColors() ) && Settings::Get().IsGameType( Game::TYPE_MULTI ) )
                 player->SetControl( CONTROL_HUMAN );
             else if ( *it & fi.AllowHumanColors() )
                 player->SetControl( player->GetControl() | CONTROL_HUMAN );
@@ -308,6 +310,12 @@ void Players::Init( const Maps::FileInfo & fi )
                "Players: "
                    << "unknown colors" );
     }
+}
+
+void Players::Set( const int color, Player * player )
+{
+    assert( color >= 0 && color < playersSize );
+    _players[color] = player;
 }
 
 Player * Players::Get( int color )
@@ -403,9 +411,9 @@ void Players::SetPlayerInGame( int color, bool f )
 void Players::SetStartGame( void )
 {
     for_each( begin(), end(), []( Player * player ) { player->SetPlay( true ); } );
-    for_each( begin(), end(), std::ptr_fun( &PlayerFocusReset ) );
-    for_each( begin(), end(), std::ptr_fun( &PlayerFixRandomRace ) );
-    for_each( begin(), end(), std::ptr_fun( &PlayerFixMultiControl ) );
+    for_each( begin(), end(), []( Player * player ) { PlayerFocusReset( player ); } );
+    for_each( begin(), end(), []( Player * player ) { PlayerFixRandomRace( player ); } );
+    for_each( begin(), end(), []( Player * player ) { PlayerFixMultiControl( player ); } );
 
     current_color = Color::NONE;
     human_colors = Color::NONE;
@@ -495,7 +503,7 @@ StreamBase & operator>>( StreamBase & msg, Players & players )
     for ( u32 ii = 0; ii < vcolors.size(); ++ii ) {
         Player * player = new Player();
         msg >> *player;
-        _players[Color::GetIndex( player->GetColor() )] = player;
+        Players::Set( Color::GetIndex( player->GetColor() ), player );
         players.push_back( player );
     }
 

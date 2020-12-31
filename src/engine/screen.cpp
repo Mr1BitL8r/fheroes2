@@ -23,6 +23,7 @@
 
 #include <SDL_version.h>
 #if SDL_VERSION_ATLEAST( 2, 0, 0 )
+#include <SDL_hints.h>
 #include <SDL_mouse.h>
 #include <SDL_render.h>
 #include <SDL_video.h>
@@ -122,18 +123,21 @@ namespace
             clear();
         }
 
-        virtual void show( bool enable ) override
-        {
-            _show = enable;
-        }
-
         virtual bool isVisible() const override
         {
-            return _show && ( SDL_ShowCursor( -1 ) == 1 );
+            if ( _emulation )
+                return fheroes2::Cursor::isVisible();
+            else
+                return fheroes2::Cursor::isVisible() && ( SDL_ShowCursor( -1 ) == 1 );
         }
 
         virtual void update( const fheroes2::Image & image, int32_t offsetX, int32_t offsetY ) override
         {
+            if ( _emulation ) {
+                fheroes2::Cursor::update( image, offsetX, offsetY );
+                return;
+            }
+
             SDL_Surface * surface = SDL_CreateRGBSurface( 0, image.width(), image.height(), 32, 0xFF, 0xFF00, 0xFF0000, 0xFF000000 );
             if ( surface == NULL )
                 return;
@@ -174,6 +178,21 @@ namespace
             std::swap( _cursor, tempCursor );
         }
 
+        virtual void enableSoftwareEmulation( const bool enable ) override
+        {
+            if ( enable == _emulation )
+                return;
+
+            if ( enable ) {
+                clear();
+                _emulation = true;
+            }
+            else {
+                _emulation = false;
+                update( _image, _image.x(), _image.y() );
+            }
+        }
+
         static RenderCursor * create()
         {
             return new RenderCursor;
@@ -182,12 +201,13 @@ namespace
     protected:
         RenderCursor()
             : _cursor( NULL )
-            , _show( false )
-        {}
+        {
+            // SDL 2 handles mouse properly without any emulation.
+            _emulation = false;
+        }
 
     private:
         SDL_Cursor * _cursor;
-        bool _show; // TODO: remove this member!
 
         void clear()
         {
@@ -198,42 +218,14 @@ namespace
         }
     };
 #else
+    // SDL 1 doesn't support hardware level cursor.
     class RenderCursor : public fheroes2::Cursor
     {
     public:
-        RenderCursor()
-            : _show( false )
-        {}
-
-        virtual ~RenderCursor() {}
-
-        virtual void show( bool enable ) override
-        {
-            _show = enable;
-        }
-
-        virtual bool isVisible() const
-        {
-            return _show;
-        }
-
-        virtual void update( const fheroes2::Image & image, int32_t offsetX, int32_t offsetY ) override
-        {
-            _image = fheroes2::Sprite( image, offsetX, offsetY );
-        }
-
-        virtual void setPosition( int32_t offsetX, int32_t offsetY ) override
-        {
-            _image.setPosition( offsetX, offsetY );
-        }
-
         static RenderCursor * create()
         {
             return new RenderCursor;
         }
-
-    private:
-        bool _show;
     };
 #endif
 }
@@ -433,7 +425,7 @@ namespace
             else {
                 SDL_UpdateTexture( _texture, NULL, _surface->pixels, _surface->pitch );
                 if ( SDL_SetRenderTarget( _renderer, NULL ) == 0 ) {
-                    if ( SDL_RenderCopy( _renderer, _texture, NULL, NULL ) == 0 ) {
+                    if ( SDL_RenderClear( _renderer ) == 0 && SDL_RenderCopy( _renderer, _texture, NULL, NULL ) == 0 ) {
                         SDL_RenderPresent( _renderer );
                     }
                 }
@@ -486,7 +478,11 @@ namespace
             }
 
             _createPalette();
-
+            SDL_SetHint( SDL_HINT_RENDER_SCALE_QUALITY, "linear" );
+            if ( SDL_RenderSetLogicalSize( _renderer, width_, height_ ) ) {
+                clear();
+                return false;
+            }
             _texture = SDL_CreateTextureFromSurface( _renderer, _surface );
             if ( _texture == NULL ) {
                 clear();
@@ -551,13 +547,7 @@ namespace
 
         int renderFlags() const
         {
-#if defined( __MINGW32CE__ ) || defined( __SYMBIAN32__ )
-            return SDL_RENDERER_SOFTWARE;
-#elif defined( __WIN32__ ) || defined( ANDROID )
             return SDL_RENDERER_ACCELERATED;
-#else
-            return SDL_RENDERER_ACCELERATED;
-#endif
         }
 
         void _createPalette()
@@ -821,9 +811,7 @@ namespace
 
         int renderFlags() const
         {
-#if defined( __MINGW32CE__ ) || defined( __SYMBIAN32__ )
-            return SDL_SWSURFACE;
-#elif defined( __WIN32__ ) || defined( ANDROID )
+#if defined( __WIN32__ ) || defined( ANDROID )
             return SDL_HWSURFACE | SDL_HWPALETTE;
 #else
             return SDL_SWSURFACE;

@@ -46,7 +46,6 @@
 #include "mus.h"
 #include "route.h"
 #include "settings.h"
-#include "splitter.h"
 #include "system.h"
 #include "world.h"
 
@@ -82,6 +81,8 @@ int Game::StartGame( void )
 
     cursor.Hide();
     AGG::ResetMixer();
+
+    Interface::Basic::Get().Reset();
 
     return Interface::Basic::Get().StartGame();
 }
@@ -544,7 +545,7 @@ int Interface::Basic::StartGame( void )
 
                 switch ( kingdom.GetControl() ) {
                 case CONTROL_HUMAN:
-                    if ( conf.GameType( Game::TYPE_HOTSEAT ) ) {
+                    if ( conf.IsGameType( Game::TYPE_HOTSEAT ) ) {
                         cursor.Hide();
                         iconsPanel.HideIcons();
                         statusWindow.Reset();
@@ -648,7 +649,7 @@ int Interface::Basic::HumanTurn( bool isload )
 
         // autosave
         if ( conf.ExtGameAutosaveOn() && conf.ExtGameAutosaveBeginOfDay() )
-            Game::Save( System::ConcatePath( conf.GetSaveDir(), "AUTOSAVE.sav" ) );
+            Game::AutoSave();
     }
 
     // check game over
@@ -662,11 +663,6 @@ int Interface::Basic::HumanTurn( bool isload )
     if ( !conf.ExtWorldOnlyFirstMonsterAttack() )
         myKingdom.HeroesActionNewPosition();
 
-    // auto hide status
-    bool autohide_status = conf.QVGA() && conf.ShowStatus();
-    if ( autohide_status )
-        Game::AnimateResetDelay( Game::AUTOHIDE_STATUS_DELAY );
-
     int fastScrollRepeatCount = 0;
     const int fastScrollThreshold = 2;
     bool isOngoingFastScrollEvent = false;
@@ -678,6 +674,8 @@ int Interface::Basic::HumanTurn( bool isload )
     Point heroAnimationOffset;
     int heroAnimationSpriteId = 0;
 
+    bool isCursorOverButtons = false;
+
     // startgame loop
     while ( Game::CANCEL == res ) {
         if ( !le.HandleEvents( true, true ) ) {
@@ -685,11 +683,6 @@ int Interface::Basic::HumanTurn( bool isload )
                 res = Game::QUITGAME;
                 break;
             }
-        }
-        // for pocketpc: auto hide status if start turn
-        if ( autohide_status && Game::AnimateInfrequentDelay( Game::AUTOHIDE_STATUS_DELAY ) ) {
-            EventSwitchShowStatus();
-            autohide_status = false;
         }
 
         if ( !isOngoingFastScrollEvent )
@@ -837,6 +830,8 @@ int Interface::Basic::HumanTurn( bool isload )
 
         const fheroes2::Rect displayArea( 0, 0, display.width(), display.height() );
         const bool isHiddenInterface = conf.ExtGameHideInterface();
+        const bool prevIsCursorOverButtons = isCursorOverButtons;
+        isCursorOverButtons = false;
         // Stop moving hero first
         if ( isMovingHero && ( le.MouseClickLeft( displayArea ) || le.MousePressRight( displayArea ) ) ) {
             stopHero = true;
@@ -858,6 +853,7 @@ int Interface::Basic::HumanTurn( bool isload )
             if ( Cursor::POINTER != cursor.Themes() )
                 cursor.SetThemes( Cursor::POINTER );
             res = buttonsArea.QueueEventProcessing();
+            isCursorOverButtons = true;
         }
         // cursor over status area
         else if ( ( !isHiddenInterface || conf.ShowStatus() ) && le.MouseCursor( statusWindow.GetRect() ) ) {
@@ -879,6 +875,10 @@ int Interface::Basic::HumanTurn( bool isload )
             if ( Cursor::POINTER != cursor.Themes() )
                 cursor.SetThemes( Cursor::POINTER );
             gameArea.ResetCursorPosition();
+        }
+
+        if ( prevIsCursorOverButtons && !isCursorOverButtons ) {
+            buttonsArea.ResetButtons();
         }
 
         // fast scroll
@@ -1009,7 +1009,12 @@ int Interface::Basic::HumanTurn( bool isload )
                     fadeInfo.object = MP2::OBJ_ZERO;
                 }
                 else if ( !fadeInfo.isFadeOut && fadeInfo.alpha > 235 ) {
-                    world.GetTiles( fadeInfo.tile ).SetObject( fadeInfo.object );
+                    Maps::Tiles & objectTile = world.GetTiles( fadeInfo.tile );
+                    objectTile.SetObject( fadeInfo.object );
+                    // TODO: we need to expand the logic to all objects.
+                    if ( fadeInfo.object == MP2::OBJ_BOAT ) {
+                        objectTile.SetObjectSpriteIndex( fadeInfo.index );
+                    }
                     fadeInfo.object = MP2::OBJ_ZERO;
                 }
                 else {
@@ -1044,7 +1049,7 @@ int Interface::Basic::HumanTurn( bool isload )
         }
 
         if ( conf.ExtGameAutosaveOn() && !conf.ExtGameAutosaveBeginOfDay() )
-            Game::Save( System::ConcatePath( conf.GetSaveDir(), "AUTOSAVE.sav" ) );
+            Game::AutoSave();
     }
 
     return res;

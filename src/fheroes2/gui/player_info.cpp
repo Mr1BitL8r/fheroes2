@@ -218,6 +218,11 @@ void Interface::PlayersInfo::RedrawInfo( bool show_play_info ) const /* show_pla
     }
 }
 
+void Interface::PlayersInfo::resetSelection()
+{
+    currentSelectedPlayer = nullptr;
+}
+
 bool Interface::PlayersInfo::QueueEventProcessing( void )
 {
     Settings & conf = Settings::Get();
@@ -246,11 +251,11 @@ bool Interface::PlayersInfo::QueueEventProcessing( void )
         if ( NULL != ( player = GetFromOpponentClick( le.GetMouseCursor() ) ) ) {
             const Maps::FileInfo & fi = conf.CurrentFileInfo();
             Players & players = conf.GetPlayers();
-
-            if ( ( player->GetColor() & fi.AllowHumanColors() ) && ( !Settings::Get().GameType( Game::TYPE_MULTI ) || !( player->GetColor() & fi.HumanOnlyColors() ) ) ) {
+            if ( ( player->GetColor() & fi.AllowHumanColors() )
+                 && ( !Settings::Get().IsGameType( Game::TYPE_MULTI ) || !( player->GetColor() & fi.HumanOnlyColors() ) ) ) {
                 u32 humans = players.GetColors( CONTROL_HUMAN, true );
 
-                if ( conf.GameType( Game::TYPE_MULTI ) ) {
+                if ( conf.IsGameType( Game::TYPE_MULTI ) ) {
                     if ( currentSelectedPlayer == nullptr ) {
                         currentSelectedPlayer = player;
                     }

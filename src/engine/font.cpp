@@ -87,31 +87,31 @@ int FontTTF::LineSkip( void ) const
     return TTF_FontLineSkip( ptr );
 }
 
-Surface FontTTF::RenderText( const std::string & msg, const RGBA & clr, bool solid )
-{
-    return Surface( solid ? TTF_RenderUTF8_Solid( ptr, msg.c_str(), clr() ) : TTF_RenderUTF8_Blended( ptr, msg.c_str(), clr() ) );
-}
-
-Surface FontTTF::RenderChar( char ch, const RGBA & clr, bool solid )
-{
-    char buf[2] = {'\0', '\0'};
-    buf[0] = ch;
-
-    return Surface( solid ? TTF_RenderUTF8_Solid( ptr, buf, clr() ) : TTF_RenderUTF8_Blended( ptr, buf, clr() ) );
-}
-
-Surface FontTTF::RenderUnicodeText( const std::vector<u16> & msg, const RGBA & clr, bool solid )
-{
-    return Surface( solid ? TTF_RenderUNICODE_Solid( ptr, &msg[0], clr() ) : TTF_RenderUNICODE_Blended( ptr, &msg[0], clr() ) );
-}
-
-Surface FontTTF::RenderUnicodeChar( u16 ch, const RGBA & clr, bool solid )
-{
-    u16 buf[2] = {L'\0', L'\0'};
-    buf[0] = ch;
-
-    return Surface( solid ? TTF_RenderUNICODE_Solid( ptr, buf, clr() ) : TTF_RenderUNICODE_Blended( ptr, buf, clr() ) );
-}
+// Surface FontTTF::RenderText( const std::string & msg, const RGBA & clr, bool solid )
+// {
+//     return Surface( solid ? TTF_RenderUTF8_Solid( ptr, msg.c_str(), clr() ) : TTF_RenderUTF8_Blended( ptr, msg.c_str(), clr() ) );
+// }
+//
+// Surface FontTTF::RenderChar( char ch, const RGBA & clr, bool solid )
+// {
+//     char buf[2] = {'\0', '\0'};
+//     buf[0] = ch;
+//
+//     return Surface( solid ? TTF_RenderUTF8_Solid( ptr, buf, clr() ) : TTF_RenderUTF8_Blended( ptr, buf, clr() ) );
+// }
+//
+// Surface FontTTF::RenderUnicodeText( const std::vector<u16> & msg, const RGBA & clr, bool solid )
+// {
+//     return Surface( solid ? TTF_RenderUNICODE_Solid( ptr, &msg[0], clr() ) : TTF_RenderUNICODE_Blended( ptr, &msg[0], clr() ) );
+// }
+//
+// Surface FontTTF::RenderUnicodeChar( u16 ch, const RGBA & clr, bool solid )
+// {
+//     u16 buf[2] = {L'\0', L'\0'};
+//     buf[0] = ch;
+//
+//     return Surface( solid ? TTF_RenderUNICODE_Solid( ptr, buf, clr() ) : TTF_RenderUNICODE_Blended( ptr, buf, clr() ) );
+// }
 
 #endif
 
@@ -138,7 +138,8 @@ fheroes2::Image FontPSF::RenderText( const std::string & text, const uint8_t col
         int32_t offsetX = ( *it ) * _size.width * _size.height / 8; // bits -> byte
 
         for ( int32_t y = 0; y < _size.height; ++y ) {
-            int32_t offset = ( y * _size.width / 8 ) + offsetX; // bits -> byte
+            // It's safe to cast as all values are >= 0
+            const size_t offset = static_cast<size_t>( ( y * _size.width / 8 ) + offsetX ); // bits -> byte
 
             if ( offset < _data.size() ) {
                 const int32_t line = _data[offset];

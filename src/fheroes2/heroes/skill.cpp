@@ -220,13 +220,6 @@ std::string Skill::Primary::StringDescription( int skill, const Heroes * hero )
     return res;
 }
 
-std::string Skill::Primary::StringSkills( const std::string & sep ) const
-{
-    std::ostringstream os;
-    os << GetString( attack ) << sep << GetString( defense ) << sep << GetString( knowledge ) << sep << GetString( power );
-    return os.str();
-}
-
 const char * Skill::Level::String( int level )
 {
     const char * str_level[] = {"None", _( "skill|Basic" ), _( "skill|Advanced" ), _( "skill|Expert" )};
@@ -621,21 +614,21 @@ Skill::SecSkills::SecSkills( int race )
 
 int Skill::SecSkills::GetLevel( int skill ) const
 {
-    const_iterator it = std::find_if( begin(), end(), std::bind2nd( std::mem_fun_ref( &Secondary::isSkill ), skill ) );
+    const_iterator it = std::find_if( begin(), end(), [skill]( const Secondary & v ) { return v.isSkill( skill ); } );
 
     return it == end() ? Level::NONE : ( *it ).Level();
 }
 
 u32 Skill::SecSkills::GetValues( int skill ) const
 {
-    const_iterator it = std::find_if( begin(), end(), std::bind2nd( std::mem_fun_ref( &Secondary::isSkill ), skill ) );
+    const_iterator it = std::find_if( begin(), end(), [skill]( const Secondary & v ) { return v.isSkill( skill ); } );
 
     return it == end() ? 0 : ( *it ).GetValues();
 }
 
 int Skill::SecSkills::Count( void ) const
 {
-    return std::count_if( begin(), end(), std::mem_fun_ref( &Secondary::isValid ) );
+    return std::count_if( begin(), end(), []( const Secondary & v ) { return v.isValid(); } );
 }
 
 int Skill::SecSkills::GetTotalLevel() const
@@ -652,11 +645,12 @@ int Skill::SecSkills::GetTotalLevel() const
 void Skill::SecSkills::AddSkill( const Skill::Secondary & skill )
 {
     if ( skill.isValid() ) {
-        iterator it = std::find_if( begin(), end(), std::bind2nd( std::mem_fun_ref( &Secondary::isSkill ), skill.Skill() ) );
+        const int skillValue = skill.Skill();
+        iterator it = std::find_if( begin(), end(), [skillValue]( const Secondary & v ) { return v.isSkill( skillValue ); } );
         if ( it != end() )
             ( *it ).SetLevel( skill.Level() );
         else {
-            it = std::find_if( begin(), end(), std::not1( std::mem_fun_ref( &Secondary::isValid ) ) );
+            it = std::find_if( begin(), end(), []( const Secondary & v ) { return !v.isValid(); } );
             if ( it != end() )
                 ( *it ).Set( skill );
             else if ( size() < HEROESMAXSKILL )
@@ -667,7 +661,7 @@ void Skill::SecSkills::AddSkill( const Skill::Secondary & skill )
 
 Skill::Secondary * Skill::SecSkills::FindSkill( int skill )
 {
-    iterator it = std::find_if( begin(), end(), std::bind2nd( std::mem_fun_ref( &Secondary::isSkill ), skill ) );
+    iterator it = std::find_if( begin(), end(), [skill]( const Secondary & v ) { return v.isSkill( skill ); } );
     return it != end() ? &( *it ) : NULL;
 }
 
@@ -731,17 +725,6 @@ int Skill::SecondaryGetWeightSkillFromRace( int race, int skill )
     return 0;
 }
 
-/*
-std::vector<int> Skill::SecondarySkills(void)
-{
-    const int vals[] = { Secondary::PATHFINDING, Secondary::ARCHERY, Secondary::LOGISTICS, Secondary::SCOUTING,
-            Secondary::DIPLOMACY, Secondary::NAVIGATION, Secondary::LEADERSHIP, Secondary::WISDOM, Secondary::MYSTICISM,
-            Secondary::LUCK, Secondary::BALLISTICS, Secondary::EAGLEEYE, Secondary::NECROMANCY, Secondary::ESTATES };
-
-    return std::vector<int>(vals, ARRAY_COUNT_END(vals));
-}
-*/
-
 int Skill::SecondaryPriorityFromRace( int race, const std::vector<int> & exclude )
 {
     Rand::Queue parts( MAXSECONDARYSKILL );
@@ -784,7 +767,7 @@ void Skill::SecSkills::FindSkillsForLevelUp( int race, Secondary & sec1, Seconda
         sec2.NextLevel();
     }
     else if ( Settings::Get().ExtHeroAllowBannedSecSkillsUpgrade() ) {
-        const_iterator it = std::find_if( begin(), end(), std::not1( std::bind2nd( std::mem_fun_ref( &Secondary::isLevel ), static_cast<int>( Level::EXPERT ) ) ) );
+        const_iterator it = std::find_if( begin(), end(), []( const Secondary & v ) { return !v.isLevel( static_cast<int>( Level::EXPERT ) ); } );
         if ( it != end() ) {
             sec1.SetSkill( ( *it ).Skill() );
             sec1.SetLevel( GetLevel( sec1.Skill() ) );

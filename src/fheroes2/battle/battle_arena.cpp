@@ -245,8 +245,8 @@ Battle::Arena::Arena( Army & a1, Army & a2, s32 index, bool local )
         towers[0] = castle->isBuild( BUILD_LEFTTURRET ) ? new Tower( *castle, TWR_LEFT ) : NULL;
         towers[1] = new Tower( *castle, TWR_CENTER );
         towers[2] = castle->isBuild( BUILD_RIGHTTURRET ) ? new Tower( *castle, TWR_RIGHT ) : NULL;
-        bool fortification = ( Race::KNGT == castle->GetRace() ) && castle->isBuild( BUILD_SPEC );
-        catapult = army1->GetCommander() ? new Catapult( *army1->GetCommander(), fortification ) : NULL;
+        const bool fortification = ( Race::KNGT == castle->GetRace() ) && castle->isBuild( BUILD_SPEC );
+        catapult = army1->GetCommander() ? new Catapult( *army1->GetCommander() ) : NULL;
         bridge = new Bridge();
 
         // catapult cell
@@ -329,11 +329,12 @@ void Battle::Arena::TurnTroop( Unit * current_troop )
 {
     Actions actions;
     end_turn = false;
+    const bool isImmovable = current_troop->Modes( SP_BLIND | IS_PARALYZE_MAGIC );
 
     DEBUG( DBG_BATTLE, DBG_TRACE, current_troop->String( true ) );
 
     // morale check right before the turn
-    if ( !current_troop->Modes( SP_BLIND | IS_PARALYZE_MAGIC ) ) {
+    if ( !isImmovable ) {
         if ( current_troop->isAffectedByMorale() )
             current_troop->SetRandomMorale();
     }
@@ -380,8 +381,8 @@ void Battle::Arena::TurnTroop( Unit * current_troop )
             }
 
             // good morale
-            if ( !end_turn && current_troop->isValid() && !current_troop->Modes( TR_SKIPMOVE ) && current_troop->Modes( TR_MOVED )
-                 && current_troop->Modes( MORALE_GOOD ) ) {
+            if ( !end_turn && current_troop->isValid() && !current_troop->Modes( TR_SKIPMOVE ) && current_troop->Modes( TR_MOVED ) && current_troop->Modes( MORALE_GOOD )
+                 && !isImmovable ) {
                 actions.push_back( Command( MSG_BATTLE_MORALE, current_troop->GetUID(), true ) );
                 end_turn = false;
             }
@@ -692,10 +693,10 @@ const Battle::Unit * Battle::Arena::GetEnemyMaxQuality( int my_color ) const
     return res;
 }
 
-void Battle::Arena::FadeArena( void ) const
+void Battle::Arena::FadeArena( bool clearMessageLog ) const
 {
     if ( interface )
-        interface->FadeArena();
+        interface->FadeArena( clearMessageLog );
 }
 
 const SpellStorage & Battle::Arena::GetUsageSpells( void ) const
@@ -832,11 +833,34 @@ bool Battle::Arena::isDisableCastSpell( const Spell & spell, std::string * msg )
 
 bool Battle::Arena::GraveyardAllowResurrect( s32 index, const Spell & spell ) const
 {
-    const HeroBase * hero = GetCurrentCommander();
-    const Unit * killed = GetTroopUID( graveyard.GetLastTroopUID( index ) );
-    const Unit * tail = killed && killed->isWide() ? GetTroopUID( graveyard.GetLastTroopUID( killed->GetTailIndex() ) ) : NULL;
+    if ( !spell.isResurrect() )
+        return false;
 
-    return killed && ( !killed->isWide() || killed == tail ) && hero && spell.isResurrect() && killed->AllowApplySpell( spell, hero, NULL );
+    const HeroBase * hero = GetCurrentCommander();
+    if ( hero == NULL )
+        return false;
+
+    const Unit * killed = GetTroopUID( graveyard.GetLastTroopUID( index ) );
+    if ( killed == NULL )
+        return false;
+
+    if ( !killed->AllowApplySpell( spell, hero, NULL ) )
+        return false;
+
+    if ( Board::GetCell( index )->GetUnit() != NULL )
+        return false;
+
+    if ( !killed->isWide() )
+        return true;
+
+    const int tailIndex = killed->GetTailIndex();
+    const int headIndex = killed->GetHeadIndex();
+    const int secondIndex = tailIndex == index ? headIndex : tailIndex;
+
+    if ( Board::GetCell( secondIndex )->GetUnit() != NULL )
+        return false;
+
+    return true;
 }
 
 const Battle::Unit * Battle::Arena::GraveyardLastTroop( s32 index ) const

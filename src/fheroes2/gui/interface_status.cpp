@@ -44,6 +44,8 @@ Interface::StatusWindow::StatusWindow( Basic & basic )
     , state( STATUS_UNKNOWN )
     , oldState( STATUS_UNKNOWN )
     , lastResource( Resource::UNKNOWN )
+    , countLastResource( 0 )
+    , turn_progress( 0 )
 {}
 
 void Interface::StatusWindow::Reset( void )
@@ -60,17 +62,17 @@ int Interface::StatusWindow::GetState( void ) const
     return state;
 }
 
-u32 Interface::StatusWindow::ResetResourceStatus( u32 tick, void * ptr )
+u32 Interface::StatusWindow::ResetResourceStatus( u32 /*tick*/, void * ptr )
 {
     if ( ptr ) {
         Interface::StatusWindow * status = reinterpret_cast<Interface::StatusWindow *>( ptr );
         if ( STATUS_RESOURCE == status->state ) {
             status->state = status->oldState;
-            Cursor::Get().Hide();
             Interface::Basic::Get().SetRedraw( REDRAW_STATUS );
         }
-        else
+        else {
             status->timerShowLastResource.Remove();
+        }
     }
 
     return 0;
